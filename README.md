@@ -6,17 +6,20 @@
 * http://www.rabbitmq.com/getstarted.html
 * https://github.com/Graylog2/graylog2-server/wiki/AMQP
 
+### config file
+    edit the config file, setup port and transport
+
 ### on MacOS X:
 
     $ vim /etc/syslog.conf
-    *.notice;authpriv,remoteauth,ftp,install,internal.none  @127.0.0.1:8000         
+    *.notice;authpriv,remoteauth,ftp,install,internal.none  @127.0.0.1:6660
     $ launchctl unload /System/Library/LaunchDaemons/com.apple.syslogd.plist
     $ launchctl load /System/Library/LaunchDaemons/com.apple.syslogd.plist
 
 ### on Linux:
 
     $ vim /etc/rsyslog.d/logix.conf
-    *.*  @127.0.0.1:8000         
+    *.*  @127.0.0.1:6660
     $ /etc/init.d/rsyslog restart
 
 ### Running: 
