@@ -1,0 +1,63 @@
+Only in gevent/gevent: ares.so
+diff -au gevent/gevent/baseserver.py gevent-orig/gevent/baseserver.py
+--- gevent/gevent/baseserver.py	2012-01-08 12:28:22.000000000 -0200
++++ gevent-orig/gevent/baseserver.py	2012-01-08 12:32:47.000000000 -0200
+@@ -119,14 +119,12 @@
+             self.start_accepting()
+ 
+     def start_accepting(self):
+-        self.on_start()
+         if self._watcher is None:
+             # just stop watcher without creating a new one?
+             self._watcher = self.loop.io(self.socket.fileno(), 1)
+             self._watcher.start(self._do_read)
+ 
+     def stop_accepting(self):
+-        self.on_stop()
+         if self._watcher is not None:
+             self._watcher.stop()
+             self._watcher = None
+@@ -148,7 +146,6 @@
+                 return
+             try:
+                 args = self.do_read()
+-                self.on_new_connection(args)
+                 self.delay = self.min_delay
+                 if not args:
+                     return
+@@ -295,14 +292,6 @@
+     def is_fatal_error(self, ex):
+         return isinstance(ex, _socket.error) and ex[0] in self.fatal_errors
+ 
+-    def on_start(self):
+-        pass
+-
+-    def on_stop(self):
+-        pass
+-
+-    def on_new_connection(self, args):
+-        pass
+ 
+ def _extract_family(host):
+     if host.startswith('[') and host.endswith(']'):
+Only in gevent/gevent: core.so
+diff -au gevent/gevent/server.py gevent-orig/gevent/server.py
+--- gevent/gevent/server.py	2012-01-08 12:02:49.000000000 -0200
++++ gevent-orig/gevent/server.py	2012-01-08 12:32:48.000000000 -0200
+@@ -93,7 +93,6 @@
+     """A UDP server"""
+ 
+     def __init__(self, *args, **kwargs):
+-        self._packet_size = kwargs.pop('packet_size')
+         BaseServer.__init__(self, *args, **kwargs)
+         from gevent.coros import Semaphore
+         self._writelock = Semaphore()
+@@ -110,7 +109,7 @@
+ 
+     def do_read(self):
+         try:
+-            data, address = self._socket.recvfrom(self._packet_size)
++            data, address = self._socket.recvfrom(8192)
+         except _socket.error, err:
+             if err[0] == EWOULDBLOCK:
+                 return
