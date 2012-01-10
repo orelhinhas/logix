@@ -35,3 +35,8 @@
 ## Todo
 * needs tweak on amqp pool
 * would benefit of an internal backlog queue
+
+## to test
+LOGIX_CONF=../etc/logix.conf python logix --action nodaemon
+
+

@@ -38,9 +38,6 @@ class SyslogServer(DatagramServer):
         self.socket.sendto('Received %s bytes' % len(data), address)
         self._parse_and_queue_datagram(data, address)
     
-    def on_new_connection(self, args):
-        logging.info(args)
-
     def _parse_and_queue_datagram(self, data, address):
         parsed = {}
         (fac, sev, parsed['data']) = self._calc_lvl(data.strip())
