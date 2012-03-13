@@ -1,0 +1,116 @@
+#!/usr/bin/python
+#
+# Copyright 2012 Juliano Martinez
+# All Rights Reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+#
+# @author: Juliano Martinez
+# @author: Gleicon Moraes
+
+from gevent import monkey
+monkey.patch_all()
+
+import os
+import re
+import pwd
+import sys
+import math
+import time
+import gevent
+import getopt
+import logging
+import ConfigParser
+import json
+
+from supay import Daemon
+from gevent import socket
+from riemann import RiemannClient, RiemannUDPTransport
+
+hostname = os.uname()[1]
+severity = ['emerg', 'alert', 'crit', 'err', 'warn', 'notice', 'info', 'debug']
+facility = ['kern', 'user', 'mail', 'daemon', 'auth', 'syslog', 'lpr', 'news', 'uucp',
+            'cron', 'authpriv', 'ftp', 'ntp', 'audit', 'alert', 'at', 'local0', 'local1',
+            'local2', 'local3', 'local4', 'local5', 'local6', 'local7']
+
+fs_match = re.compile("<(.+)>([A-Z]{3} .*)", re.I)
+
+def parse_and_queue_datagram(line, host):
+    parsed = {}
+    rmsg = {}
+    (fac, sev, parsed['line']) = _calc_lvl(line.strip())
+    parsed['host'] = rmsg['host'] = host if not '127.0.0.1' in host else hostname
+    parsed['timestamp'] = rmsg['time'] = int(time.time())
+    parsed['facility'] = fac
+    parsed['level'] = sev
+    parsed['version'] = '1.0'
+    parsed['short_message'] = "%s" % (parsed['line'])
+    rmsg['description'] = json.dumps(parsed)
+    rmsg['service'] = "syslogd"
+    rmsg['state'] = severity[sev]
+    print rmsg
+    try:
+        rc = RiemannClient(transport = RiemannUDPTransport)
+        rc.send(rmsg)
+    except Exception, e:
+        print "Error: %e" % e
+
+def _calc_lvl(line):
+    lvl = fs_match.split(line)
+    if lvl and len(lvl) > 1:
+        i = int(lvl[1])
+        fac = int(math.floor(i / 8))
+        sev = i - (fac * 8)
+        return (facility[fac].capitalize(), sev, lvl[2])
+    return (None, None, lvl[2])
+
+def main():
+    logging.info("Starting Logix")
+    config_file = '/etc/logix/logix.conf' if os.path.isfile('/etc/logix/logix.conf') else os.getenv('LOGIX_CONF')
+    if not os.path.isfile(config_file):
+        logging.error("Config file %s not found" % config_file)
+        sys.exit(1)
+
+    config = ConfigParser.RawConfigParser()
+    config.read(config_file)
+
+    s = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP)
+    s.bind(('',config.getint('server', 'port')))
+
+    while True:
+        data, peer = s.recvfrom(config.getint('server', 'max_syslog_line_size') - 1)
+        logging.debug("New data: %s" % data)
+        gevent.spawn(parse_and_queue_datagram, data, peer)
+
+if __name__ == '__main__':
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "a:", ["action="])
+    except getopt.GetoptError, err:
+        print str(err)
+
+    action = 'start'
+    for o, a in opts:
+        if o in ('-a', '--action'):
+            action = a
+
+    daemon = Daemon(name='loggix', catch_all_log="/var/log/logix.log")
+    if action == 'start':
+        daemon.start()
+        os.setuid(pwd.getpwnam('logix')[2])
+        main()
+    elif action == 'status':
+        daemon.status()
+    elif action == 'stop':
+        daemon.stop()
+    elif action == 'foreground':
+        main()
