@@ -1,4 +1,4 @@
-# Logix - Transports your local syslog to Graylog2 via AMQP
+# Logix - Transports your local syslog to Graylog2 via AMQP dd
 * http://graylog2.org/about
 
 ## Why should I use it?
